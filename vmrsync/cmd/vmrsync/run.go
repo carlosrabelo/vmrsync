@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/carlosrabelo/vmrsync/vmrsync/internal/cli"
+	"github.com/carlosrabelo/vmrsync/vmrsync/internal/rsyncrun"
 	"github.com/carlosrabelo/vmrsync/vmrsync/internal/usage"
 	"github.com/carlosrabelo/vmrsync/vmrsync/internal/version"
 )
@@ -26,7 +27,7 @@ func run(osArgs []string) {
 		os.Exit(0)
 	}
 
-	command, _ := cli.FindCommand(osArgs[1:])
+	command, rest := cli.FindCommand(osArgs[1:])
 
 	switch command {
 	case "version":
@@ -35,8 +36,12 @@ func run(osArgs []string) {
 	case "help":
 		usage.Print()
 		os.Exit(0)
-	case "prepare", "completion", "check", "restore", "backup":
+	case "prepare", "completion", "check":
 		log.Fatalf("%s is not implemented", command)
+	case "restore", "backup":
+		cfg := cli.ParseSyncArgs(command, rest)
+		rsyncrun.SetupEnvironment(cfg)
+		rsyncrun.RunSync(cfg)
 	default:
 		if len(osArgs) > 1 && !strings.HasPrefix(osArgs[1], "-") {
 			log.Fatalf("Invalid command '%s'. Must be 'restore', 'backup', 'prepare', 'check', 'completion', 'version', or 'help'.", osArgs[1])
