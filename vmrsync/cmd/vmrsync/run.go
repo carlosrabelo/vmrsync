@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/carlosrabelo/vmrsync/vmrsync/internal/cli"
+	"github.com/carlosrabelo/vmrsync/vmrsync/internal/prepare"
 	"github.com/carlosrabelo/vmrsync/vmrsync/internal/rsyncrun"
 	"github.com/carlosrabelo/vmrsync/vmrsync/internal/usage"
 	"github.com/carlosrabelo/vmrsync/vmrsync/internal/version"
@@ -36,7 +37,10 @@ func run(osArgs []string) {
 	case "help":
 		usage.Print()
 		os.Exit(0)
-	case "prepare", "completion", "check":
+	case "prepare":
+		prepare.Run(rest)
+		os.Exit(0)
+	case "completion", "check":
 		log.Fatalf("%s is not implemented", command)
 	case "restore", "backup":
 		cfg := cli.ParseSyncArgs(command, rest)
