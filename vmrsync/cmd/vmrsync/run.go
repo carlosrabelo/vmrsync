@@ -8,6 +8,7 @@ import (
 
 	"github.com/carlosrabelo/vmrsync/vmrsync/internal/check"
 	"github.com/carlosrabelo/vmrsync/vmrsync/internal/cli"
+	"github.com/carlosrabelo/vmrsync/vmrsync/internal/completion"
 	"github.com/carlosrabelo/vmrsync/vmrsync/internal/prepare"
 	"github.com/carlosrabelo/vmrsync/vmrsync/internal/rsyncrun"
 	"github.com/carlosrabelo/vmrsync/vmrsync/internal/usage"
@@ -42,7 +43,17 @@ func run(osArgs []string) {
 		prepare.Run(rest)
 		os.Exit(0)
 	case "completion":
-		log.Fatalf("%s is not implemented", command)
+		if len(rest) > 0 && isHelpArg(rest[0]) {
+			usage.Print()
+			os.Exit(0)
+		}
+		if len(rest) != 1 {
+			log.Fatalf("usage: vmrsync completion bash|zsh|fish")
+		}
+		if err := completion.Install(rest[0]); err != nil {
+			log.Fatalf("[ERROR] failed to install completion: %v", err)
+		}
+		os.Exit(0)
 	case "check":
 		check.Run(rest)
 		os.Exit(0)
