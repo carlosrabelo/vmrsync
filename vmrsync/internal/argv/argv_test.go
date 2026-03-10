@@ -2,6 +2,7 @@ package argv
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -11,6 +12,7 @@ func TestSplitArgs(t *testing.T) {
 		input     []string
 		wantPos   []string
 		wantFlags []string
+		wantErr   string
 	}{
 		{
 			name:    "positional only",
@@ -21,6 +23,12 @@ func TestSplitArgs(t *testing.T) {
 			name:      "flag after positional",
 			input:     []string{"vm21", "--dry-run"},
 			wantPos:   []string{"vm21"},
+			wantFlags: []string{"--dry-run"},
+		},
+		{
+			name:      "folder then options",
+			input:     []string{"vm21", "project1", "--dry-run"},
+			wantPos:   []string{"vm21", "project1"},
 			wantFlags: []string{"--dry-run"},
 		},
 		{
@@ -42,16 +50,37 @@ func TestSplitArgs(t *testing.T) {
 			wantFlags: []string{"--ssh-key=/tmp/id_rsa"},
 		},
 		{
-			name:      "empty input",
-			input:     []string{},
-			wantPos:   nil,
-			wantFlags: nil,
+			name:    "empty input",
+			input:   []string{},
+			wantPos: nil,
+		},
+		{
+			name:    "positional after options",
+			input:   []string{"vm21", "--dry-run", "project1"},
+			wantErr: "unexpected argument",
+		},
+		{
+			name:    "options before machine",
+			input:   []string{"--dry-run", "vm21"},
+			wantErr: "unexpected argument",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pos, flags := SplitArgs(tt.input)
+			pos, flags, err := SplitArgs(tt.input)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("error %q, want substring %q", err.Error(), tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 			if !reflect.DeepEqual(pos, tt.wantPos) {
 				t.Errorf("positional = %v, want %v", pos, tt.wantPos)
 			}

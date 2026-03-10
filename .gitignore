@@ -20,9 +20,9 @@ credentials.json
 # Directories
 bin/*
 !bin/.gitkeep
+dist/
 
 # Files
-# Stray `go build` binary at repo root; do not ignore the vmrsync/ source tree
 /vmrsync
 !/vmrsync/
 *.test

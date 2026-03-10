@@ -12,21 +12,21 @@ Sincronização bidirecional de arquivos entre uma árvore de trabalho local e m
 - Inicialize `/vmrsync` no remoto com `vmrsync prepare` (usa `sudo` no remoto)
 - Sincronize para `/vmrsync` no remoto por padrão, ou `--mirror` para usar o mesmo caminho do local
 - Recusa alvos que se resolvem para esta máquina (localhost, loopback, hostname local, IPs locais)
-- Pré-visualize com `--dry-run`, limite o tempo com `--timeout-seconds`, ajuste SSH com `--ssh-port` / `--ssh-key`
+- Visualize com `--dry-run`, limite o tempo com `--timeout-seconds`, ajuste SSH via `--ssh-port` / `--ssh-key`
 - `--exclude`, `--exclude-from`, `.vmrsyncignore` automático, `--no-delete`, `--verbose`, `--quiet`
 - `vmrsync check` verifica SSH e se os caminhos de sync existem antes de sincronizar
 - Completion system-wide via `sudo vmrsync completion bash|zsh|fish`
 
 ## Pré-requisitos
 
-- **Go 1.26+** — compilar a partir do código; [download](https://go.dev/dl/)
+- **Go 1.26+** — build a partir do código; [download](https://go.dev/dl/)
 - **rsync** e **cliente OpenSSH** (`ssh`) na máquina onde você executa o `vmrsync`
 - **Acesso SSH** ao host remoto (e `sudo` no remoto para `prepare`)
 - **Root** — necessário para `completion` system-wide em `/usr/local`
 
 ## Instalação
 
-### Compilar a partir do código
+### Build a partir do código
 
 ```bash
 git clone https://github.com/carlosrabelo/vmrsync.git
@@ -34,29 +34,28 @@ cd vmrsync
 make build
 ```
 
+Instale em `~/.local/bin` (padrão), ou defina `PREFIX` para um prefixo customizado. Instalação system-wide é via `.deb`:
+
 ```bash
-make install         # → ~/.local/bin/vmrsync
-make install-system  # → /usr/local/bin/vmrsync (sudo só na cópia)
+make install
+make uninstall
+make package
+sudo dpkg -i dist/*.deb
 ```
 
-Prefira `make install-system` antes do completion para o `sudo vmrsync` estar no PATH (`secure_path` costuma omitir `~/.local/bin`):
+Prefira o `.deb` (binário em `/usr/bin`) antes do completion para o `sudo vmrsync` estar no PATH (`secure_path` costuma omitir `~/.local/bin`):
 
 ```bash
-make install-system
+make build
+make package
+sudo dpkg -i dist/*.deb
 sudo vmrsync completion bash   # ou zsh / fish
 
 # após instalação local do usuário:
 sudo "$(command -v vmrsync)" completion bash
 ```
 
-### Desinstalar
-
-```bash
-make uninstall         # → ~/.local/bin (sudo só se necessário)
-make uninstall-system  # → /usr/local/bin (sudo só se necessário)
-```
-
-Veja o [Guia de Uso](docs/GUIDE-PT.md) para os caminhos de limpeza do completion (system-wide e legado do usuário).
+Veja o [Guia de Uso](docs/GUIDE-PT.md) para caminhos de limpeza do completion (system-wide e legado user-local).
 
 ### Com `go install`
 
@@ -78,6 +77,8 @@ vmrsync backup my-vm project1 --mirror
 sudo vmrsync completion bash
 ```
 
+Ordem fixa dos argumentos: `<command> <machine> [<folder>] [options]`.
+
 A raiz padrão é `$HOME/Sources` (`VMRSYNC_PATH`). No modo staging (padrão) o remoto usa `/vmrsync`; com `--mirror` o remoto usa o mesmo caminho.
 
 ## Configuração
@@ -95,7 +96,7 @@ A raiz padrão é `$HOME/Sources` (`VMRSYNC_PATH`). No modo staging (padrão) o 
 vmrsync/cmd/vmrsync/   # Ponto de entrada da CLI
 vmrsync/internal/      # cli, config, hostcheck, rsyncrun, completion, …
 bin/                   # Binários compilados (git-ignored)
-.make/                 # Scripts de build e instalação
+.make/                 # Scripts de build e install
 docs/                  # Guias de uso + GitHub Pages
 ```
 
@@ -104,11 +105,11 @@ docs/                  # Guias de uso + GitHub Pages
 ```bash
 make build           # Compila o binário em bin/vmrsync
 make test            # Executa todos os testes
-make quality         # Formata, faz vet e lint
+make quality         # Formata, vet e lint
 make install         # Instala o binário em ~/.local/bin
-make install-system  # Instala o binário em /usr/local/bin
 make uninstall       # Remove de ~/.local/bin
-make uninstall-system  # Remove de /usr/local/bin
+make package         # Gera .deb em dist/ (binário em /usr/bin)
+make deb             # Alias de package
 ```
 
 ## Contribuição

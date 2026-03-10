@@ -26,7 +26,10 @@ func Run(args []string) {
 	fs.BoolVar(&dryRun, "dry-run", false, "Print the SSH command that would be executed, without running it")
 	fs.Usage = usage.Print
 
-	positional, flagTokens := argv.SplitArgs(args)
+	positional, flagTokens, err := argv.SplitArgs(args)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	if err := fs.Parse(flagTokens); err != nil {
 		log.Fatal(err)

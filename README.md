@@ -34,26 +34,25 @@ cd vmrsync
 make build
 ```
 
+Install to `~/.local/bin` (default), or set `PREFIX` for a custom prefix. System-wide install is via a `.deb`:
+
 ```bash
-make install         # → ~/.local/bin/vmrsync
-make install-system  # → /usr/local/bin/vmrsync (sudo only for copy)
+make install
+make uninstall
+make package
+sudo dpkg -i dist/*.deb
 ```
 
-Prefer `make install-system` before completion so `sudo vmrsync` is on PATH (`secure_path` often omits `~/.local/bin`):
+Prefer the `.deb` (binary at `/usr/bin`) before completion so `sudo vmrsync` is on PATH (`secure_path` often omits `~/.local/bin`):
 
 ```bash
-make install-system
+make build
+make package
+sudo dpkg -i dist/*.deb
 sudo vmrsync completion bash   # or zsh / fish
 
 # after user-local install:
 sudo "$(command -v vmrsync)" completion bash
-```
-
-### Uninstall
-
-```bash
-make uninstall         # → ~/.local/bin (sudo only if needed)
-make uninstall-system  # → /usr/local/bin (sudo only if needed)
 ```
 
 See the [User Guide](docs/GUIDE.md) for completion cleanup paths (system-wide and legacy user-local).
@@ -77,6 +76,8 @@ vmrsync backup my-vm project1 --dry-run
 vmrsync backup my-vm project1 --mirror
 sudo vmrsync completion bash
 ```
+
+Order is fixed: `<command> <machine> [<folder>] [options]`.
 
 Default sync root is `$HOME/Sources` (`VMRSYNC_PATH`). Staging (default) uses `/vmrsync` on the remote; `--mirror` uses the same path on the remote.
 
@@ -106,9 +107,9 @@ make build           # Compile binary to bin/vmrsync
 make test            # Run all tests
 make quality         # Format, vet, and lint
 make install         # Install binary to ~/.local/bin
-make install-system  # Install binary to /usr/local/bin
 make uninstall       # Remove from ~/.local/bin
-make uninstall-system  # Remove from /usr/local/bin
+make package         # Build .deb into dist/ (binary at /usr/bin)
+make deb             # Alias for package
 ```
 
 ## Contributing

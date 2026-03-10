@@ -15,7 +15,9 @@ func Print() {
 	fmt.Printf(`VM RSync v%s - Synchronize files between local and remote machines via rsync
 
 Usage:
-  %s [options] <command> <machine> [<folder>]
+  %s <command> <machine> [<folder>] [options]
+
+Argument order is fixed: command, then machine, then optional folder, then options.
 
 Commands:
   restore     Sync FROM remote machine TO local machine

@@ -62,7 +62,10 @@ func run(osArgs []string) {
 		rsyncrun.SetupEnvironment(cfg)
 		rsyncrun.RunSync(cfg)
 	default:
-		if len(osArgs) > 1 && !strings.HasPrefix(osArgs[1], "-") {
+		if len(osArgs) > 1 && strings.HasPrefix(osArgs[1], "-") {
+			log.Fatalf("command must be the first argument (got %q); expected: <command> <machine> [<folder>] [options]", osArgs[1])
+		}
+		if len(osArgs) > 1 {
 			log.Fatalf("Invalid command '%s'. Must be 'restore', 'backup', 'prepare', 'check', 'completion', 'version', or 'help'.", osArgs[1])
 		}
 		usage.Print()

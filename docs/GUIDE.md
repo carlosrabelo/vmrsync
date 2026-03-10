@@ -49,12 +49,13 @@ cd vmrsync
 ```bash
 make build
 make install         # → ~/.local/bin/vmrsync
-make install-system  # → /usr/local/bin/vmrsync (sudo only for copy)
+make package         # → dist/*.deb (binary at /usr/bin)
+sudo dpkg -i dist/*.deb
 ```
 
-3. **Install shell completion** (root only, system-wide under `/usr/local`). Prefer `make install-system` so `sudo vmrsync` is on PATH (`secure_path` often omits `~/.local/bin`):
+3. **Install shell completion** (root only, system-wide under `/usr/local`). Prefer the `.deb` so `sudo vmrsync` is on PATH (`secure_path` often omits `~/.local/bin`):
 ```bash
-make install-system
+make build && make package && sudo dpkg -i dist/*.deb
 sudo vmrsync completion bash
 sudo vmrsync completion zsh
 sudo vmrsync completion fish
@@ -73,8 +74,8 @@ vmrsync version
 ```bash
 make build
 install -D bin/vmrsync $HOME/.local/bin/vmrsync
-# or, as root:
-# install -D bin/vmrsync /usr/local/bin/vmrsync
+# or system-wide via package:
+# make package && sudo dpkg -i dist/*.deb
 sudo "$(command -v vmrsync)" completion bash
 ```
 
@@ -82,7 +83,7 @@ sudo "$(command -v vmrsync)" completion bash
 
 ```bash
 make uninstall         # → ~/.local/bin (sudo only if needed)
-make uninstall-system  # → /usr/local/bin (sudo only if needed)
+sudo apt remove vmrsync   # or: sudo dpkg -r vmrsync
 # Completion (if installed):
 sudo rm -f /usr/local/share/bash-completion/completions/vmrsync
 sudo rm -f /usr/local/share/zsh/site-functions/_vmrsync
@@ -193,6 +194,8 @@ No special setup needed. Just ensure your remote user has write access to the di
 ```
 vmrsync <command> <machine> [<folder>] [options]
 ```
+
+Argument order is fixed: `command`, then `machine`, then optional `folder`, then options. Flags before the command or between positionals are rejected.
 
 ### Commands
 

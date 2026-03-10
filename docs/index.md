@@ -19,7 +19,8 @@ Bidirectional file synchronization between a local workspace tree and remote mac
 git clone https://github.com/carlosrabelo/vmrsync.git
 cd vmrsync
 make build
-make install-system
+make package
+sudo dpkg -i dist/*.deb
 sudo vmrsync completion bash
 ```
 ## Repository

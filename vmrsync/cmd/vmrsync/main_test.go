@@ -102,10 +102,18 @@ func TestDryRun(t *testing.T) {
 		wantExit   int
 	}{
 		{
-			name:    "dry-run flag before command",
-			args:    []string{"--dry-run", "restore", "vm21", "project1"},
-			env:     []string{srcEnv},
-			wantOut: "rsync -az",
+			name:     "flag before command is rejected",
+			args:     []string{"--dry-run", "restore", "vm21", "project1"},
+			env:      []string{srcEnv},
+			wantOut:  "command must be the first argument",
+			wantExit: 1,
+		},
+		{
+			name:     "folder after options is rejected",
+			args:     []string{"restore", "vm21", "--dry-run", "project1"},
+			env:      []string{srcEnv},
+			wantOut:  "unexpected argument",
+			wantExit: 1,
 		},
 		{
 			name:    "dry-run shows rsync command",
@@ -282,14 +290,26 @@ func TestSplitArgs(t *testing.T) {
 		input     []string
 		wantPos   []string
 		wantFlags []string
+		wantErr   bool
 	}{
-		{[]string{"vm21", "project1"}, []string{"vm21", "project1"}, nil},
-		{[]string{"vm21", "--dry-run"}, []string{"vm21"}, []string{"--dry-run"}},
-		{[]string{"vm21", "project1", "--dry-run"}, []string{"vm21", "project1"}, []string{"--dry-run"}},
-		{[]string{}, nil, nil},
+		{[]string{"vm21", "project1"}, []string{"vm21", "project1"}, nil, false},
+		{[]string{"vm21", "--dry-run"}, []string{"vm21"}, []string{"--dry-run"}, false},
+		{[]string{"vm21", "project1", "--dry-run"}, []string{"vm21", "project1"}, []string{"--dry-run"}, false},
+		{[]string{}, nil, nil, false},
+		{[]string{"vm21", "--dry-run", "project1"}, nil, nil, true},
 	}
 	for _, tt := range tests {
-		pos, flags := argv.SplitArgs(tt.input)
+		pos, flags, err := argv.SplitArgs(tt.input)
+		if tt.wantErr {
+			if err == nil {
+				t.Errorf("SplitArgs(%v) expected error", tt.input)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("SplitArgs(%v) unexpected error: %v", tt.input, err)
+			continue
+		}
 		if len(pos) != len(tt.wantPos) {
 			t.Errorf("SplitArgs(%v) positional = %v, want %v", tt.input, pos, tt.wantPos)
 			continue

@@ -31,7 +31,10 @@ func ParseSyncArgs(command string, args []string) *config.AppConfig {
 	fs.BoolVar(&cfg.Mirror, "mirror", false, "Mirror local path on the remote instead of using /vmrsync")
 	fs.Usage = usage.Print
 
-	positional, flagTokens := argv.SplitArgs(args)
+	positional, flagTokens, err := argv.SplitArgs(args)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	if err := fs.Parse(flagTokens); err != nil {
 		log.Fatal(err)
