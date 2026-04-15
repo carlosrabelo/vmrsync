@@ -10,7 +10,7 @@ Uma ferramenta CLI em Go para sincronização bidirecional de arquivos entre má
 - `vmrsync out`: Sincroniza DO local PARA o remoto
 - `vmrsync setup`: Prepara o diretório remoto (requer sudo na máquina remota)
 
-O diretório remoto é fixo em `/vmrsync`. O diretório local padrão é `$HOME/Sources`.
+O diretório remoto espelha a estrutura do diretório local por padrão, ou usa `/vmrsync` com `--staging`. O diretório local padrão é `$HOME/Sources`.
 
 ## Requisitos
 
@@ -82,6 +82,9 @@ vmrsync out vm21 project1 --exclude "*.log" --exclude "node_modules"
 
 # Opções SSH personalizadas
 vmrsync in vm21 project1 --ssh-port 2222 --ssh-key ~/.ssh/id_rsa
+
+# Usar modo staging (/vmrsync em vez de espelhar caminho local)
+vmrsync out vm21 project1 --staging
 ```
 
 ## Opções
@@ -94,27 +97,34 @@ vmrsync in vm21 project1 --ssh-port 2222 --ssh-key ~/.ssh/id_rsa
 | `--ssh-key <caminho>`| Caminho da chave privada SSH                               |
 | `--verbose`          | Habilita saída detalhada do rsync                          |
 | `--no-delete`        | Não deleta arquivos no destino                             |
-| `--backup-dir <path>`| Diretório de backup para arquivos deletados/substituídos   |
+| `--staging`          | Usa /vmrsync como raiz remota em vez de espelhar caminho local |
 | `-h, --help`         | Exibe a ajuda                                              |
 
 ## Variáveis de Ambiente
 
 | Variável            | Padrão               | Descrição                    |
 |---------------------|----------------------|------------------------------|
-| `VMRSYNC_LOCAL_ROOT`| `$HOME/Sources`      | Diretório raiz local         |
+| `VMRSYNC_PATH`      | `$HOME/Sources`      | Diretório raiz de sincronização, local e remoto         |
 
 ## Estrutura de Caminhos
 
+Por padrão (modo espelhamento):
 ```
-Local:  $VMRSYNC_LOCAL_ROOT/[pasta]/   →   $HOME/Sources/[pasta]/
-Remoto: /vmrsync/[pasta]/
+Local:  $VMRSYNC_PATH/[pasta]/   →   Remoto: $VMRSYNC_PATH/[pasta]/
+```
+
+Com flag --staging:
+```
+Local:  $VMRSYNC_PATH/[pasta]/   →   Remoto: /vmrsync/[pasta]/
 ```
 
 Se nenhuma pasta for especificada, toda a raiz é sincronizada.
 
 ## Como Funciona
 
-1. Verifica que `/vmrsync` existe na máquina remota (ignorado com `--dry-run`)
+1. Verifica que o diretório de destino existe na máquina remota (ignorado com `--dry-run`)
+   - Por padrão: usa o mesmo caminho do local (espelha estrutura local)
+   - Com --staging: usa `/vmrsync`
 2. Monta um comando rsync com `-az --info=progress2 --mkpath --delete`
 3. Executa o rsync via SSH
 

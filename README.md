@@ -10,7 +10,7 @@ A Go CLI tool for bidirectional file synchronization between local and remote ma
 - `vmrsync out`: Sync FROM local TO remote
 - `vmrsync setup`: Prepare the remote directory (requires sudo on remote)
 
-The remote directory is fixed at `/vmrsync`. The local root defaults to `$HOME/Sources`.
+The remote directory mirrors the local directory structure by default, or uses `/vmrsync` with `--staging`. The local root defaults to `$HOME/Sources`.
 
 ## Requirements
 
@@ -82,6 +82,9 @@ vmrsync out vm21 project1 --exclude "*.log" --exclude "node_modules"
 
 # Custom SSH options
 vmrsync in vm21 project1 --ssh-port 2222 --ssh-key ~/.ssh/id_rsa
+
+# Use staging mode (/vmrsync instead of mirroring local path)
+vmrsync out vm21 project1 --staging
 ```
 
 ## Options
@@ -94,27 +97,34 @@ vmrsync in vm21 project1 --ssh-port 2222 --ssh-key ~/.ssh/id_rsa
 | `--ssh-key <path>`   | SSH private key path                                   |
 | `--verbose`          | Enable verbose rsync output                            |
 | `--no-delete`        | Do not delete files at destination                     |
-| `--backup-dir <path>`| Backup deleted/replaced files to this directory        |
+| `--staging`          | Use /vmrsync as remote root instead of mirroring local path |
 | `-h, --help`         | Show help                                              |
 
 ## Environment Variables
 
 | Variable            | Default              | Description              |
 |---------------------|----------------------|--------------------------|
-| `VMRSYNC_LOCAL_ROOT`| `$HOME/Sources`      | Local root directory     |
+| `VMRSYNC_PATH`      | `$HOME/Sources`      | Sync root directory, local and remote     |
 
 ## Path Structure
 
+By default (mirror mode):
 ```
-Local:  $VMRSYNC_LOCAL_ROOT/[folder]/   →   $HOME/Sources/[folder]/
-Remote: /vmrsync/[folder]/
+Local:  $VMRSYNC_PATH/[folder]/   →   Remote: $VMRSYNC_PATH/[folder]/
+```
+
+With --staging flag:
+```
+Local:  $VMRSYNC_PATH/[folder]/   →   Remote: /vmrsync/[folder]/
 ```
 
 If no folder is specified, the entire root is synced.
 
 ## How It Works
 
-1. Checks that `/vmrsync` exists on the remote machine (skipped with `--dry-run`)
+1. Checks that the target directory exists on the remote machine (skipped with `--dry-run`)
+   - By default: uses the same path as local (mirrors local structure)
+   - With --staging: uses `/vmrsync`
 2. Builds an rsync command with `-az --info=progress2 --mkpath --delete`
 3. Executes rsync over SSH
 
