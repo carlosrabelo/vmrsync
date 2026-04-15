@@ -1,0 +1,31 @@
+#!/bin/bash
+
+_vmrsync_completion() {
+    local cur prev words cword
+    _init_completion || return
+
+    case ${prev} in
+        in|out)
+            return
+            ;;
+        --exclude)
+            return
+            ;;
+        --ssh-port)
+            return
+            ;;
+        --ssh-key)
+            _filedir
+            return
+            ;;
+    esac
+
+    if [[ ${cword} -eq 1 ]]; then
+        COMPREPLY=($(compgen -W "in out setup version -h --help" -- "${cur}"))
+        return
+    fi
+
+    COMPREPLY=($(compgen -W "--dry-run --exclude --ssh-port --ssh-key --verbose --no-delete --staging -h --help" -- "${cur}"))
+}
+
+complete -F _vmrsync_completion vmrsync
