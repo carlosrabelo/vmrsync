@@ -1,51 +1,79 @@
 # VM RSync
 
-A Go CLI tool for bidirectional file synchronization between local and remote machines via rsync over SSH.
+Bidirectional file synchronization between a local workspace tree and remote machines, driven by rsync over SSH with `in`, `out`, and `setup` commands.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Version](https://img.shields.io/badge/Go-1.26%2B-blue.svg)](https://go.dev/)
+
+## Highlights
+
+- Pull from or push to a remote host with `vmrsync in` and `vmrsync out`
+- Initialize `/vmrsync` on the remote with `vmrsync setup` (uses `sudo` on the remote)
+- Mirror paths under `VMRSYNC_PATH` or use `--staging` to target `/vmrsync` on the remote
+- Reject targets that resolve to this machine (localhost, loopback, local hostname, and local interface addresses) to reduce accidental destructive syncs
+- Preview commands with `--dry-run`, cap runtime with `--timeout-seconds`, and tune SSH via `--ssh-port` and `--ssh-key`
+- Repeatable `--exclude` patterns, `--no-delete`, and `--verbose` for rsync output
+- Install copies the binary to `~/.local/bin` and installs bash completion when you `make install`
 
 ## Overview
 
-`vmrsync` wraps rsync to synchronize a fixed directory structure between a local machine and a remote VM:
+`vmrsync` wraps `rsync` so you keep the same relative layout locally and on the VM. The default local and remote root is `$HOME/Sources` unless you set `VMRSYNC_PATH`. For staging-style trees fixed on the remote under `/vmrsync`, pass `--staging`. See [docs/GUIDE.md](docs/GUIDE.md) for network safety notes (for example bastions and `ProxyJump`).
 
-- `vmrsync in`: Sync FROM remote TO local
-- `vmrsync out`: Sync FROM local TO remote
-- `vmrsync setup`: Prepare the remote directory (requires sudo on remote)
+## Prerequisites
 
-The remote directory mirrors the local directory structure by default, or uses `/vmrsync` with `--staging`. The local root defaults to `$HOME/Sources`.
-
-## Requirements
-
-- Go (for building)
-- rsync
-- SSH access to remote machines
+- **Go 1.26+** — build from source; see [go.dev/dl](https://go.dev/dl/)
+- **rsync** and **OpenSSH client** (`ssh`) on the machine where you run `vmrsync`
+- **SSH access** to the remote host as a user that can read and write the synced paths (and `sudo` for `setup` when creating `/vmrsync`)
 
 ## Installation
+
+### Build from source
+
+```bash
+git clone https://github.com/carlosrabelo/vmrsync.git
+cd vmrsync
+make build
+```
+
+### Install to `~/.local/bin`
 
 ```bash
 make install
 ```
 
-Installs `vmrsync` to `$HOME/.local/bin` and bash completion to `$HOME/.local/share/bash-completion/completions/`.
+This installs `vmrsync` to `$HOME/.local/bin` and bash completion to `$HOME/.local/share/bash-completion/completions/` when the completion file is present.
 
-To uninstall:
+### Uninstall
 
 ```bash
 make uninstall
 ```
 
-## First-time Setup
-
-Before syncing, `/vmrsync` must exist on the remote machine with correct ownership (UID 1000). Run:
+### Using `go install`
 
 ```bash
-vmrsync setup <machine>
+go install github.com/carlosrabelo/vmrsync/vmrsync/cmd/vmrsync@latest
 ```
 
-This SSHes into the machine and runs `sudo mkdir -p /vmrsync && sudo chown 1000:1000 /vmrsync`.
+## Quick Start
 
-Preview without executing:
+Ensure `/vmrsync` exists on the remote when you plan to use `--staging`:
 
 ```bash
-vmrsync setup <machine> --dry-run
+vmrsync setup my-vm
+```
+
+Then sync a folder:
+
+```bash
+vmrsync out my-vm project1
+vmrsync in my-vm project1
+```
+
+Preview the rsync command without running it:
+
+```bash
+vmrsync out my-vm project1 --dry-run
 ```
 
 ## Usage
@@ -87,54 +115,74 @@ vmrsync in vm21 project1 --ssh-port 2222 --ssh-key ~/.ssh/id_rsa
 vmrsync out vm21 project1 --staging
 ```
 
-## Options
-
-| Option               | Description                                            |
-|----------------------|--------------------------------------------------------|
-| `--dry-run`          | Print the rsync command without executing it           |
-| `--exclude <pattern>`| Exclude files matching pattern (repeatable)            |
-| `--ssh-port <port>`  | SSH port                                               |
-| `--ssh-key <path>`   | SSH private key path                                   |
-| `--verbose`          | Enable verbose rsync output                            |
-| `--no-delete`        | Do not delete files at destination                     |
-| `--staging`          | Use /vmrsync as remote root instead of mirroring local path |
-| `-h, --help`         | Show help                                              |
-
-## Environment Variables
-
-| Variable            | Default              | Description              |
-|---------------------|----------------------|--------------------------|
-| `VMRSYNC_PATH`      | `$HOME/Sources`      | Sync root directory, local and remote     |
-
-## Path Structure
+### Sync paths
 
 By default (mirror mode):
+
 ```
 Local:  $VMRSYNC_PATH/[folder]/   →   Remote: $VMRSYNC_PATH/[folder]/
 ```
 
-With --staging flag:
+With `--staging`:
+
 ```
 Local:  $VMRSYNC_PATH/[folder]/   →   Remote: /vmrsync/[folder]/
 ```
 
-If no folder is specified, the entire root is synced.
+If `folder` is omitted, the whole root under `VMRSYNC_PATH` is synced.
 
-## How It Works
+### Behavior
 
-1. Checks that the target directory exists on the remote machine (skipped with `--dry-run`)
-   - By default: uses the same path as local (mirrors local structure)
-   - With --staging: uses `/vmrsync`
-2. Builds an rsync command with `-az --info=progress2 --mkpath --delete`
-3. Executes rsync over SSH
+1. Verifies the destination path exists on the remote (skipped with `--dry-run`): mirror mode uses the same path as locally; `--staging` uses `/vmrsync`
+2. Builds an `rsync` invocation with `-az --info=progress2 --mkpath` and delete semantics unless `--no-delete` is set
+3. Runs `rsync` over SSH
+
+## Configuration
+
+### Flags
+
+| Option                  | Description                                                      |
+|-------------------------|------------------------------------------------------------------|
+| `--dry-run`             | Print the rsync command without executing it                     |
+| `--exclude <pattern>`   | Exclude files matching pattern (repeatable)                      |
+| `--ssh-port <port>`     | SSH port                                                         |
+| `--ssh-key <path>`      | SSH private key path                                             |
+| `--verbose`             | Enable verbose rsync output                                      |
+| `--no-delete`           | Do not delete files at destination                               |
+| `--staging`             | Use `/vmrsync` as remote root instead of mirroring the local path |
+| `--timeout-seconds <n>` | Hard cap on rsync runtime in seconds (default `7200`; `0` disables) |
+| `-h`, `--help`          | Show help                                                        |
+
+### Environment variables
+
+| Variable       | Default         | Description                               |
+|----------------|-----------------|-------------------------------------------|
+| `VMRSYNC_PATH` | `$HOME/Sources` | Root directory for sync, local and remote |
+
+## Project Layout
+
+```
+vmrsync/cmd/vmrsync/   # Go entrypoint (`main` package)
+.make/                 # Build, test, install, and uninstall shell helpers
+docs/                  # Long-form guides (English and Portuguese)
+bin/                   # Compiled binary (git-ignored; created by `make build`)
+vmrsync.bash-completion
+Makefile
+go.mod
+LICENSE
+```
 
 ## Development
 
 ```bash
-make build   # compile to bin/vmrsync
-make test    # run tests
-make lint    # run go vet
-make fmt     # format source
+make build      # Compile binary to bin/vmrsync
+make test       # Run Go unit tests
+make lint       # Run go vet
+make fmt        # Format code with gofmt
+make clean      # Remove build artifacts under bin/
+make install    # Build and install to ~/.local/bin
+make uninstall  # Remove binary and completion from ~/.local
+make help       # List Makefile targets
 ```
 
 ## Contributing
@@ -148,4 +196,4 @@ Please keep documentation bilingual (English and Portuguese).
 
 ## License
 
-This project is open source. See the LICENSE file for details.
+This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
