@@ -465,13 +465,27 @@ vmrsync out prod-server project1 --ssh-key ~/.ssh/id_prod
 
 #### Network Security
 
-```bash
-# Create SSH tunnel
-ssh -L 2222:remote-server:22 jump-server
+`vmrsync` refuses targets that refer to this machine: `localhost` (and common variants), loopback addresses (`127.0.0.1`, `::1`, etc.), the local hostname from `os.Hostname()`, and any address assigned to a non-loopback interface on the host where you run the command. There is no flag to override this. It prevents accidental sync (especially with `--delete`) against your own `~/Sources` or mirror paths.
 
-# Use tunnel for sync
-vmrsync out localhost:2222 project1 --ssh-port 2222
+Use a **real remote hostname or IP** as the machine argument (not `localhost`). If you reach the VM through a bastion, put **`ProxyJump`** or **`ProxyCommand`** in `~/.ssh/config` (or other OpenSSH `Host`/`HostName` settings). `vmrsync` invokes `ssh`/`rsync` like a normal CLI SSH client, so those entries apply automatically when you pass the `Host` alias:
+
+```bash
+# ~/.ssh/config example:
+# Host my-vm
+#   HostName 10.0.0.50
+#   User dev
+#   ProxyJump user@jump-server
+
+vmrsync out my-vm project1
 ```
+
+For a **fixed tree on the next machine** (under `/vmrsync` after `vmrsync setup`), use **`--staging`** as documented above—same safety rules apply to the machine you pass.
+
+#### rsync robustness notes
+
+- `vmrsync` passes `--protect-args` to rsync to avoid remote-side argument interpretation issues.
+- `vmrsync` uses `--mkpath` when available; on older rsync versions it falls back to creating the remote path via SSH for `out`.
+- `--timeout-seconds` sets a hard upper bound on the rsync runtime (default: 7200 seconds; set to 0 to disable).
 
 ## Troubleshooting
 

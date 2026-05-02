@@ -466,12 +466,21 @@ vmrsync out prod-server project1 --ssh-key ~/.ssh/id_prod
 #### Segurança de Rede
 
 ```bash
-# Criar túnel SSH
-ssh -L 2222:remote-server:22 jump-server
+`vmrsync` recusa alvos que se referem a esta máquina: `localhost` (e variantes comuns), endereços de loopback (`127.0.0.1`, `::1`, etc.), o hostname local (`os.Hostname()`), e qualquer endereço atribuído a uma interface não-loopback da máquina onde o comando está rodando. Não existe flag para bypass. Isso evita sincronizações acidentais (principalmente com `--delete`) contra o próprio host.
 
-# Usar túnel para sincronização
-vmrsync out localhost:2222 project1 --ssh-port 2222
+Use um **hostname/IP remoto real** como argumento `machine` (não `localhost`). Se você acessa a VM por bastion/jump host, configure **`ProxyJump`** ou **`ProxyCommand`** no `~/.ssh/config`. O `vmrsync` invoca `ssh`/`rsync` de forma padrão, então essas entradas se aplicam automaticamente quando você usa o alias `Host`:
+
+```bash
+# Exemplo ~/.ssh/config:
+# Host minha-vm
+#   HostName 10.0.0.50
+#   User dev
+#   ProxyJump user@jump-server
+
+vmrsync out minha-vm project1
 ```
+
+Para um destino fixo na próxima máquina (em `/vmrsync` após `vmrsync setup`), use **`--staging`** como documentado acima — as mesmas regras de segurança do host ainda valem.
 
 ## Solução de Problemas
 

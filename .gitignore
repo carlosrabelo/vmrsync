@@ -1,25 +1,4 @@
 # ============================================================================
-# AI TOOLS
-# ============================================================================
-
-# Directories
-.claude/
-.gemini/
-.antigravity/
-.opencode/
-.cursor/
-.aider/
-
-# Files
-CLAUDE.md
-CLAUDE.local.md
-GEMINI.md
-opencode.json
-.aider.conf.yml
-AGENTS.md
-.nexor/
-
-# ============================================================================
 # SECRETS
 # ============================================================================
 
@@ -38,11 +17,10 @@ credentials.json
 # GO
 # ============================================================================
 
-# Directories
-bin/
-
 # Files
-vmrsync
+# NOTE: do not ignore the `vmrsync/` source tree. Build output goes under bin/
+# (ignored above). A binary named `vmrsync` at repo root from ad-hoc builds may
+# appear untracked — use `make build` → bin/vmrsync instead.
 *.test
 coverage.out
 coverage.html
@@ -67,3 +45,7 @@ coverage.html
 # Files
 .DS_Store
 Thumbs.db
+# nexor:gitignore:begin
+bin/*
+!bin/.gitkeep
+# nexor:gitignore:end

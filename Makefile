@@ -13,10 +13,10 @@ help:
 	@echo "  uninstall - Remove binary from ~/.local/bin"
 
 build:
-	@./make/build.sh
+	@./.make/build.sh
 
 test:
-	@./make/test.sh
+	@./.make/test.sh
 
 lint:
 	@go vet ./...
@@ -29,7 +29,7 @@ clean:
 	@rm -rf bin/
 
 install: build
-	@./make/install.sh
+	@./.make/install.sh
 
 uninstall:
-	@./make/uninstall.sh
+	@./.make/uninstall.sh
