@@ -14,6 +14,7 @@ Sincronização bidirecional de arquivos entre uma árvore de trabalho local e m
 - Pré-visualize comandos com `--dry-run`, limite o tempo com `--timeout-seconds` e ajuste SSH com `--ssh-port` e `--ssh-key`
 - `--exclude` repetível, `--no-delete` e `--verbose` para a saída do rsync
 - A instalação copia o binário para `~/.local/bin` e instala bash completion ao rodar `make install`
+- O pré-check de diretório no remoto usa `test -d` no estilo POSIX com caminho entre aspas (sem `--` só do GNU) para funcionar com BusyBox e shells mínimos na VM
 
 ## Visão Geral
 
@@ -133,7 +134,7 @@ Se `folder` for omitida, sincroniza-se toda a raiz sob `VMRSYNC_PATH`.
 
 ### Comportamento
 
-1. Verifica se o caminho de destino existe no remoto (ignorado com `--dry-run`): no modo espelho usa o mesmo caminho que no local; com `--staging` usa `/vmrsync`
+1. Verifica se o caminho de destino existe no remoto via SSH não interativo (ignorado com `--dry-run`): executa `test -d` com o caminho entre aspas simples; no modo espelho o remoto deve ter o **mesmo caminho absoluto** que o `VMRSYNC_PATH` local; com `--staging` verifica `/vmrsync`. Se esta etapa falhar, teste `ssh -o BatchMode=yes <machine> "test -d <caminho>"` no mesmo ambiente em que você roda o `vmrsync` — falhas de autenticação ou de shell SSH hoje aparecem com a mesma mensagem que diretório inexistente
 2. Monta uma chamada ao `rsync` com `-az --info=progress2 --mkpath` e remoção no destino salvo se `--no-delete` estiver definido
 3. Executa o `rsync` via SSH
 
@@ -163,6 +164,7 @@ Se `folder` for omitida, sincroniza-se toda a raiz sob `VMRSYNC_PATH`.
 
 ```
 vmrsync/cmd/vmrsync/   # Ponto de entrada Go (pacote `main`)
+vmrsync/internal/      # Pacotes privados (cli, config, hostcheck, rsyncrun, …)
 .make/                 # Scripts shell de build, teste, instalação e desinstalação
 docs/                  # Guias longos (inglês e português)
 bin/                   # Binário compilado (ignorado pelo git; criado por `make build`)
@@ -188,7 +190,7 @@ make help       # Lista os alvos do Makefile
 ## Contribuindo
 
 1. Faça um fork do repositório
-2. Crie uma branch de feature: `git checkout -b feature/nome`
+2. Crie uma branch de feature: `git checkout -b feat/description`
 3. Certifique-se de que os testes passam: `make test`
 4. Abra um Pull Request
 

@@ -14,6 +14,7 @@ Bidirectional file synchronization between a local workspace tree and remote mac
 - Preview commands with `--dry-run`, cap runtime with `--timeout-seconds`, and tune SSH via `--ssh-port` and `--ssh-key`
 - Repeatable `--exclude` patterns, `--no-delete`, and `--verbose` for rsync output
 - Install copies the binary to `~/.local/bin` and installs bash completion when you `make install`
+- Remote directory preflight uses POSIX-style `test -d` with a quoted path (no GNU-only `--`) so BusyBox and minimal shells on the VM behave correctly
 
 ## Overview
 
@@ -133,7 +134,7 @@ If `folder` is omitted, the whole root under `VMRSYNC_PATH` is synced.
 
 ### Behavior
 
-1. Verifies the destination path exists on the remote (skipped with `--dry-run`): mirror mode uses the same path as locally; `--staging` uses `/vmrsync`
+1. Verifies the destination path exists on the remote over non-interactive SSH (skipped with `--dry-run`): runs `test -d` with a single-quoted path; mirror mode expects the **same absolute path** on the remote as under `VMRSYNC_PATH` locally; `--staging` checks `/vmrsync`. If this step fails, confirm `ssh -o BatchMode=yes <machine> "test -d <path>"` from the same environment as `vmrsync` — SSH auth or shell errors are currently reported with the same message as a missing directory
 2. Builds an `rsync` invocation with `-az --info=progress2 --mkpath` and delete semantics unless `--no-delete` is set
 3. Runs `rsync` over SSH
 
@@ -163,6 +164,7 @@ If `folder` is omitted, the whole root under `VMRSYNC_PATH` is synced.
 
 ```
 vmrsync/cmd/vmrsync/   # Go entrypoint (`main` package)
+vmrsync/internal/      # Private packages (cli, config, hostcheck, rsyncrun, …)
 .make/                 # Build, test, install, and uninstall shell helpers
 docs/                  # Long-form guides (English and Portuguese)
 bin/                   # Compiled binary (git-ignored; created by `make build`)
@@ -188,7 +190,7 @@ make help       # List Makefile targets
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/name`
+2. Create a feature branch: `git checkout -b feat/description`
 3. Ensure tests pass: `make test`
 4. Open a Pull Request
 
