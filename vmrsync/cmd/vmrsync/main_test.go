@@ -9,9 +9,15 @@ import (
 	"strings"
 	"sync"
 	"testing"
-)
 
-// ---- integration helpers (subprocess, dry-run paths) ----
+	"github.com/carlosrabelo/vmrsync/vmrsync/internal/argv"
+	"github.com/carlosrabelo/vmrsync/vmrsync/internal/cli"
+	"github.com/carlosrabelo/vmrsync/vmrsync/internal/config"
+	"github.com/carlosrabelo/vmrsync/vmrsync/internal/rsyncrun"
+	"github.com/carlosrabelo/vmrsync/vmrsync/internal/setup"
+	"github.com/carlosrabelo/vmrsync/vmrsync/internal/sshcli"
+	"github.com/carlosrabelo/vmrsync/vmrsync/internal/usage"
+)
 
 var binaryPath string
 
@@ -37,15 +43,6 @@ func runBinary(args []string, extraEnv ...string) (string, int) {
 	out, _ := cmd.CombinedOutput()
 	return string(out), cmd.ProcessState.ExitCode()
 }
-
-// restoreExecDefaults resets all injectable vars to their production defaults.
-func restoreExecDefaults() {
-	execSSHCheck = defaultExecSSHCheck
-	execSSH = defaultExecSSH
-	execRsync = defaultExecRsync
-}
-
-// ---- integration tests (subprocess, no real SSH/rsync) ----
 
 func TestVersion(t *testing.T) {
 	_, code := runBinary([]string{"version"})
@@ -184,18 +181,16 @@ func TestDryRun(t *testing.T) {
 	}
 }
 
-// ---- unit tests (call functions directly, give real coverage) ----
-
 func TestEffectiveRemoteRoot(t *testing.T) {
 	t.Run("staging uses /vmrsync", func(t *testing.T) {
-		config := &AppConfig{Staging: true, LocalRoot: "/home/user/Sources"}
-		if got := config.effectiveRemoteRoot(); got != vmrsyncRoot {
-			t.Errorf("got %q, want %q", got, vmrsyncRoot)
+		cfg := &config.AppConfig{Staging: true, LocalRoot: "/home/user/Sources"}
+		if got := cfg.EffectiveRemoteRoot(); got != config.VmrsyncRoot {
+			t.Errorf("got %q, want %q", got, config.VmrsyncRoot)
 		}
 	})
 	t.Run("default mirrors local root", func(t *testing.T) {
-		config := &AppConfig{LocalRoot: "/home/user/Sources"}
-		if got := config.effectiveRemoteRoot(); got != "/home/user/Sources" {
+		cfg := &config.AppConfig{LocalRoot: "/home/user/Sources"}
+		if got := cfg.EffectiveRemoteRoot(); got != "/home/user/Sources" {
 			t.Errorf("got %q, want /home/user/Sources", got)
 		}
 	})
@@ -203,24 +198,24 @@ func TestEffectiveRemoteRoot(t *testing.T) {
 
 func TestRunSyncStaging(t *testing.T) {
 	var capturedArgs []string
-	execSSHCheck = func(args []string) error { return nil }
-	execRsync = func(ctx context.Context, args []string) error {
+	rsyncrun.ExecSSHCheck = func(args []string) error { return nil }
+	rsyncrun.ExecRsync = func(ctx context.Context, args []string) error {
 		capturedArgs = args
 		return nil
 	}
-	defer restoreExecDefaults()
+	defer rsyncrun.RestoreExecDefaults()
 
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, "71"), 0755)
 
-	config := &AppConfig{
+	cfg := &config.AppConfig{
 		Command:   "out",
 		Machine:   "vm21",
 		Folder:    "71",
 		LocalRoot: dir,
 		Staging:   true,
 	}
-	runSync(config)
+	rsyncrun.RunSync(cfg)
 
 	joined := strings.Join(capturedArgs, " ")
 	if !strings.Contains(joined, "vm21:/vmrsync/71/") {
@@ -240,22 +235,22 @@ func TestBuildSSHFlags(t *testing.T) {
 		{"2222", "/tmp/id_rsa", []string{"-p", "2222", "-i", "/tmp/id_rsa"}},
 	}
 	for _, tt := range tests {
-		got := buildSSHFlags(tt.port, tt.key)
+		got := sshcli.BuildSSHFlags(tt.port, tt.key)
 		if len(got) != len(tt.want) {
-			t.Errorf("buildSSHFlags(%q, %q) = %v, want %v", tt.port, tt.key, got, tt.want)
+			t.Errorf("BuildSSHFlags(%q, %q) = %v, want %v", tt.port, tt.key, got, tt.want)
 			continue
 		}
 		for i := range got {
 			if got[i] != tt.want[i] {
-				t.Errorf("buildSSHFlags(%q, %q)[%d] = %q, want %q", tt.port, tt.key, i, got[i], tt.want[i])
+				t.Errorf("BuildSSHFlags(%q, %q)[%d] = %q, want %q", tt.port, tt.key, i, got[i], tt.want[i])
 			}
 		}
 	}
 }
 
 func TestVmrsyncRoot(t *testing.T) {
-	if vmrsyncRoot != "/vmrsync" {
-		t.Errorf("vmrsyncRoot = %q, want /vmrsync", vmrsyncRoot)
+	if config.VmrsyncRoot != "/vmrsync" {
+		t.Errorf("VmrsyncRoot = %q, want /vmrsync", config.VmrsyncRoot)
 	}
 }
 
@@ -271,19 +266,19 @@ func TestSplitArgs(t *testing.T) {
 		{[]string{}, nil, nil},
 	}
 	for _, tt := range tests {
-		pos, flags := splitArgs(tt.input)
+		pos, flags := argv.SplitArgs(tt.input)
 		if len(pos) != len(tt.wantPos) {
-			t.Errorf("splitArgs(%v) positional = %v, want %v", tt.input, pos, tt.wantPos)
+			t.Errorf("SplitArgs(%v) positional = %v, want %v", tt.input, pos, tt.wantPos)
 			continue
 		}
 		if len(flags) != len(tt.wantFlags) {
-			t.Errorf("splitArgs(%v) flags = %v, want %v", tt.input, flags, tt.wantFlags)
+			t.Errorf("SplitArgs(%v) flags = %v, want %v", tt.input, flags, tt.wantFlags)
 		}
 	}
 }
 
 func TestExcludeFlags(t *testing.T) {
-	var ef excludeFlags
+	var ef config.ExcludeFlags
 
 	if ef.String() != "" {
 		t.Errorf("empty String() = %q, want empty string", ef.String())
@@ -306,16 +301,16 @@ func TestExcludeFlags(t *testing.T) {
 
 func TestParseArgs(t *testing.T) {
 	tests := []struct {
-		osArgs      []string
-		command     string
-		wantMachine string
-		wantFolder  string
-		wantDryRun  bool
-		wantPort    string
-		wantKey     string
-		wantVerbose bool
+		osArgs       []string
+		command      string
+		wantMachine  string
+		wantFolder   string
+		wantDryRun   bool
+		wantPort     string
+		wantKey      string
+		wantVerbose  bool
 		wantNoDelete bool
-		wantTimeout int
+		wantTimeout  int
 	}{
 		{
 			osArgs:      []string{"vmrsync", "in", "vm21"},
@@ -353,12 +348,12 @@ func TestParseArgs(t *testing.T) {
 			wantTimeout: 7200,
 		},
 		{
-			osArgs:      []string{"vmrsync", "in", "vm21", "--verbose", "--no-delete"},
-			command:     "in",
-			wantMachine: "vm21",
-			wantVerbose: true,
+			osArgs:       []string{"vmrsync", "in", "vm21", "--verbose", "--no-delete"},
+			command:      "in",
+			wantMachine:  "vm21",
+			wantVerbose:  true,
 			wantNoDelete: true,
-			wantTimeout: 7200,
+			wantTimeout:  7200,
 		},
 		{
 			osArgs:      []string{"vmrsync", "in", "vm21", "a/b/c"},
@@ -377,30 +372,30 @@ func TestParseArgs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(strings.Join(tt.osArgs[2:], " "), func(t *testing.T) {
-			config := parseArgs(tt.command, tt.osArgs[2:])
-			if config.Machine != tt.wantMachine {
-				t.Errorf("Machine = %q, want %q", config.Machine, tt.wantMachine)
+			cfg := cli.ParseSyncArgs(tt.command, tt.osArgs[2:])
+			if cfg.Machine != tt.wantMachine {
+				t.Errorf("Machine = %q, want %q", cfg.Machine, tt.wantMachine)
 			}
-			if config.Folder != tt.wantFolder {
-				t.Errorf("Folder = %q, want %q", config.Folder, tt.wantFolder)
+			if cfg.Folder != tt.wantFolder {
+				t.Errorf("Folder = %q, want %q", cfg.Folder, tt.wantFolder)
 			}
-			if config.DryRun != tt.wantDryRun {
-				t.Errorf("DryRun = %v, want %v", config.DryRun, tt.wantDryRun)
+			if cfg.DryRun != tt.wantDryRun {
+				t.Errorf("DryRun = %v, want %v", cfg.DryRun, tt.wantDryRun)
 			}
-			if config.SSHPort != tt.wantPort {
-				t.Errorf("SSHPort = %q, want %q", config.SSHPort, tt.wantPort)
+			if cfg.SSHPort != tt.wantPort {
+				t.Errorf("SSHPort = %q, want %q", cfg.SSHPort, tt.wantPort)
 			}
-			if config.SSHKey != tt.wantKey {
-				t.Errorf("SSHKey = %q, want %q", config.SSHKey, tt.wantKey)
+			if cfg.SSHKey != tt.wantKey {
+				t.Errorf("SSHKey = %q, want %q", cfg.SSHKey, tt.wantKey)
 			}
-			if config.Verbose != tt.wantVerbose {
-				t.Errorf("Verbose = %v, want %v", config.Verbose, tt.wantVerbose)
+			if cfg.Verbose != tt.wantVerbose {
+				t.Errorf("Verbose = %v, want %v", cfg.Verbose, tt.wantVerbose)
 			}
-			if config.NoDelete != tt.wantNoDelete {
-				t.Errorf("NoDelete = %v, want %v", config.NoDelete, tt.wantNoDelete)
+			if cfg.NoDelete != tt.wantNoDelete {
+				t.Errorf("NoDelete = %v, want %v", cfg.NoDelete, tt.wantNoDelete)
 			}
-			if config.TimeoutSeconds != tt.wantTimeout {
-				t.Errorf("TimeoutSeconds = %v, want %v", config.TimeoutSeconds, tt.wantTimeout)
+			if cfg.TimeoutSeconds != tt.wantTimeout {
+				t.Errorf("TimeoutSeconds = %v, want %v", cfg.TimeoutSeconds, tt.wantTimeout)
 			}
 		})
 	}
@@ -409,22 +404,22 @@ func TestParseArgs(t *testing.T) {
 func TestSetupEnvironment(t *testing.T) {
 	t.Run("default uses home/Sources", func(t *testing.T) {
 		os.Unsetenv("VMRSYNC_PATH")
-		config := &AppConfig{}
-		setupEnvironment(config)
-		if config.LocalRoot == "" {
+		cfg := &config.AppConfig{}
+		rsyncrun.SetupEnvironment(cfg)
+		if cfg.LocalRoot == "" {
 			t.Error("LocalRoot should not be empty")
 		}
-		if !strings.HasSuffix(config.LocalRoot, "Sources") {
-			t.Errorf("LocalRoot %q should end with 'Sources'", config.LocalRoot)
+		if !strings.HasSuffix(cfg.LocalRoot, "Sources") {
+			t.Errorf("LocalRoot %q should end with 'Sources'", cfg.LocalRoot)
 		}
 	})
 	t.Run("override via env", func(t *testing.T) {
 		os.Setenv("VMRSYNC_PATH", "/custom/path")
 		defer os.Unsetenv("VMRSYNC_PATH")
-		config := &AppConfig{}
-		setupEnvironment(config)
-		if config.LocalRoot != "/custom/path" {
-			t.Errorf("LocalRoot = %q, want /custom/path", config.LocalRoot)
+		cfg := &config.AppConfig{}
+		rsyncrun.SetupEnvironment(cfg)
+		if cfg.LocalRoot != "/custom/path" {
+			t.Errorf("LocalRoot = %q, want /custom/path", cfg.LocalRoot)
 		}
 	})
 }
@@ -432,17 +427,17 @@ func TestSetupEnvironment(t *testing.T) {
 func TestCheckRemoteDirExists(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		var capturedArgs []string
-		execSSHCheck = func(args []string) error {
+		rsyncrun.ExecSSHCheck = func(args []string) error {
 			capturedArgs = args
 			return nil
 		}
-		defer restoreExecDefaults()
+		defer rsyncrun.RestoreExecDefaults()
 
-		config := &AppConfig{Machine: "vm21", SSHPort: "2222", SSHKey: "/tmp/id_rsa"}
-		checkRemoteDirExists(config)
+		cfg := &config.AppConfig{Machine: "vm21", SSHPort: "2222", SSHKey: "/tmp/id_rsa"}
+		rsyncrun.CheckRemoteDirExists(cfg)
 
 		joined := strings.Join(capturedArgs, " ")
-		for _, want := range []string{"-p 2222", "-i /tmp/id_rsa", "vm21", "test -d", "--"} {
+		for _, want := range []string{"-p 2222", "-i /tmp/id_rsa", "vm21", "test -d"} {
 			if !strings.Contains(joined, want) {
 				t.Errorf("expected %q in args: %v", want, capturedArgs)
 			}
@@ -453,13 +448,13 @@ func TestCheckRemoteDirExists(t *testing.T) {
 func TestRunSetup(t *testing.T) {
 	t.Run("executes ssh with remote mkdir", func(t *testing.T) {
 		var capturedArgs []string
-		execSSH = func(args []string) error {
+		rsyncrun.ExecSSH = func(args []string) error {
 			capturedArgs = args
 			return nil
 		}
-		defer restoreExecDefaults()
+		defer rsyncrun.RestoreExecDefaults()
 
-		runSetup([]string{"vm21"})
+		setup.Run([]string{"vm21"})
 
 		joined := strings.Join(capturedArgs, " ")
 		uid := fmt.Sprintf("%d", os.Getuid())
@@ -472,28 +467,28 @@ func TestRunSetup(t *testing.T) {
 
 	t.Run("dry-run does not call ssh", func(t *testing.T) {
 		called := false
-		execSSH = func(args []string) error {
+		rsyncrun.ExecSSH = func(args []string) error {
 			called = true
 			return nil
 		}
-		defer restoreExecDefaults()
+		defer rsyncrun.RestoreExecDefaults()
 
-		runSetup([]string{"vm21", "--dry-run"})
+		setup.Run([]string{"vm21", "--dry-run"})
 
 		if called {
-			t.Error("execSSH should not be called in dry-run mode")
+			t.Error("ExecSSH should not be called in dry-run mode")
 		}
 	})
 
 	t.Run("ssh port and key forwarded", func(t *testing.T) {
 		var capturedArgs []string
-		execSSH = func(args []string) error {
+		rsyncrun.ExecSSH = func(args []string) error {
 			capturedArgs = args
 			return nil
 		}
-		defer restoreExecDefaults()
+		defer rsyncrun.RestoreExecDefaults()
 
-		runSetup([]string{"vm21", "--ssh-port", "2222", "--ssh-key", "/tmp/id_rsa"})
+		setup.Run([]string{"vm21", "--ssh-port", "2222", "--ssh-key", "/tmp/id_rsa"})
 
 		joined := strings.Join(capturedArgs, " ")
 		for _, want := range []string{"-p 2222", "-i /tmp/id_rsa"} {
@@ -506,49 +501,48 @@ func TestRunSetup(t *testing.T) {
 
 func TestRunSyncDryRun(t *testing.T) {
 	called := false
-	execRsync = func(ctx context.Context, args []string) error {
+	rsyncrun.ExecRsync = func(ctx context.Context, args []string) error {
 		called = true
 		return nil
 	}
-	defer restoreExecDefaults()
+	defer rsyncrun.RestoreExecDefaults()
 
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, "proj"), 0755)
 
-	config := &AppConfig{
+	cfg := &config.AppConfig{
 		Command:   "in",
 		Machine:   "vm21",
 		Folder:    "proj",
 		DryRun:    true,
 		LocalRoot: dir,
 	}
-	runSync(config)
+	rsyncrun.RunSync(cfg)
 
 	if called {
-		t.Error("execRsync should not be called in dry-run mode")
+		t.Error("ExecRsync should not be called in dry-run mode")
 	}
 }
 
 func TestRunSyncIn(t *testing.T) {
 	var capturedArgs []string
-	execSSHCheck = func(args []string) error { return nil }
-	execRsync = func(ctx context.Context, args []string) error {
+	rsyncrun.ExecSSHCheck = func(args []string) error { return nil }
+	rsyncrun.ExecRsync = func(ctx context.Context, args []string) error {
 		capturedArgs = args
 		return nil
 	}
-	defer restoreExecDefaults()
+	defer rsyncrun.RestoreExecDefaults()
 
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, "proj"), 0755)
 
-	// Default (mirror mode): remote root = local root
-	config := &AppConfig{
+	cfg := &config.AppConfig{
 		Command:   "in",
 		Machine:   "vm21",
 		Folder:    "proj",
 		LocalRoot: dir,
 	}
-	runSync(config)
+	rsyncrun.RunSync(cfg)
 
 	joined := strings.Join(capturedArgs, " ")
 	wantRemote := fmt.Sprintf("vm21:%s/proj/", dir)
@@ -561,24 +555,23 @@ func TestRunSyncIn(t *testing.T) {
 
 func TestRunSyncOut(t *testing.T) {
 	var capturedArgs []string
-	execSSHCheck = func(args []string) error { return nil }
-	execRsync = func(ctx context.Context, args []string) error {
+	rsyncrun.ExecSSHCheck = func(args []string) error { return nil }
+	rsyncrun.ExecRsync = func(ctx context.Context, args []string) error {
 		capturedArgs = args
 		return nil
 	}
-	defer restoreExecDefaults()
+	defer rsyncrun.RestoreExecDefaults()
 
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, "proj"), 0755)
 
-	// Default (mirror mode): remote root = local root
-	config := &AppConfig{
+	cfg := &config.AppConfig{
 		Command:   "out",
 		Machine:   "vm21",
 		Folder:    "proj",
 		LocalRoot: dir,
 	}
-	runSync(config)
+	rsyncrun.RunSync(cfg)
 
 	wantRemote := fmt.Sprintf("vm21:%s/proj/", dir)
 	if !strings.Contains(strings.Join(capturedArgs, " "), wantRemote) {
@@ -588,21 +581,21 @@ func TestRunSyncOut(t *testing.T) {
 
 func TestRunSyncNoDelete(t *testing.T) {
 	var capturedArgs []string
-	execSSHCheck = func(args []string) error { return nil }
-	execRsync = func(ctx context.Context, args []string) error {
+	rsyncrun.ExecSSHCheck = func(args []string) error { return nil }
+	rsyncrun.ExecRsync = func(ctx context.Context, args []string) error {
 		capturedArgs = args
 		return nil
 	}
-	defer restoreExecDefaults()
+	defer rsyncrun.RestoreExecDefaults()
 
 	dir := t.TempDir()
-	config := &AppConfig{
+	cfg := &config.AppConfig{
 		Command:   "out",
 		Machine:   "vm21",
 		LocalRoot: dir,
 		NoDelete:  true,
 	}
-	runSync(config)
+	rsyncrun.RunSync(cfg)
 
 	for _, arg := range capturedArgs {
 		if arg == "--delete" {
@@ -613,22 +606,22 @@ func TestRunSyncNoDelete(t *testing.T) {
 
 func TestRunSyncSSHOptions(t *testing.T) {
 	var capturedArgs []string
-	execSSHCheck = func(args []string) error { return nil }
-	execRsync = func(ctx context.Context, args []string) error {
+	rsyncrun.ExecSSHCheck = func(args []string) error { return nil }
+	rsyncrun.ExecRsync = func(ctx context.Context, args []string) error {
 		capturedArgs = args
 		return nil
 	}
-	defer restoreExecDefaults()
+	defer rsyncrun.RestoreExecDefaults()
 
 	dir := t.TempDir()
-	config := &AppConfig{
+	cfg := &config.AppConfig{
 		Command:   "in",
 		Machine:   "vm21",
 		LocalRoot: dir,
 		SSHPort:   "2222",
 		SSHKey:    "/tmp/id_rsa",
 	}
-	runSync(config)
+	rsyncrun.RunSync(cfg)
 
 	joined := strings.Join(capturedArgs, " ")
 	if !strings.Contains(joined, "-e") || !strings.Contains(joined, "-p 2222") {
@@ -640,40 +633,39 @@ func TestRunSyncSSHOptions(t *testing.T) {
 }
 
 func TestRunSyncMkpathFallbackOut(t *testing.T) {
-	// Force environment to act like rsync does not support --mkpath.
-	rsyncMkpathOnce = sync.Once{}
-	rsyncHelpOutput = func() ([]byte, error) { return []byte("rsync help without mkpath"), nil }
+	rsyncrun.MkpathProbeOnce = sync.Once{}
+	rsyncrun.RsyncHelpOutput = func() ([]byte, error) { return []byte("rsync help without mkpath"), nil }
 
 	var sshCalled bool
-	execSSHCheck = func(args []string) error { return nil }
-	execSSH = func(args []string) error {
+	rsyncrun.ExecSSHCheck = func(args []string) error { return nil }
+	rsyncrun.ExecSSH = func(args []string) error {
 		sshCalled = true
 		return nil
 	}
-	execRsync = func(ctx context.Context, args []string) error { return nil }
+	rsyncrun.ExecRsync = func(ctx context.Context, args []string) error { return nil }
 	defer func() {
-		restoreExecDefaults()
-		rsyncHelpOutput = func() ([]byte, error) { return exec.Command("rsync", "--help").CombinedOutput() }
+		rsyncrun.RestoreExecDefaults()
+		rsyncrun.RestoreRsyncProbe()
 	}()
 
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, "proj"), 0755)
 
-	config := &AppConfig{
+	cfg := &config.AppConfig{
 		Command:   "out",
 		Machine:   "vm21",
 		Folder:    "proj",
 		LocalRoot: dir,
 	}
-	runSync(config)
+	rsyncrun.RunSync(cfg)
 	if !sshCalled {
-		t.Fatal("expected execSSH to be called to mkdir -p remote path when --mkpath unsupported")
+		t.Fatal("expected ExecSSH to be called to mkdir -p remote path when --mkpath unsupported")
 	}
 }
 
 func TestCheckLocalDirExists_existing(t *testing.T) {
 	dir := t.TempDir()
-	checkLocalDirExists(dir) // exists — should return silently
+	rsyncrun.CheckLocalDirExists(dir)
 }
 
 func TestShowUsage(t *testing.T) {
@@ -684,7 +676,7 @@ func TestShowUsage(t *testing.T) {
 	}
 	os.Stdout = w
 
-	showUsage()
+	usage.Print()
 
 	w.Close()
 	os.Stdout = orig

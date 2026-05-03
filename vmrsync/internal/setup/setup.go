@@ -1,4 +1,4 @@
-package main
+package setup
 
 import (
 	"flag"
@@ -6,9 +6,17 @@ import (
 	"log"
 	"os"
 	"strings"
+
+	"github.com/carlosrabelo/vmrsync/vmrsync/internal/argv"
+	"github.com/carlosrabelo/vmrsync/vmrsync/internal/config"
+	"github.com/carlosrabelo/vmrsync/vmrsync/internal/hostcheck"
+	"github.com/carlosrabelo/vmrsync/vmrsync/internal/rsyncrun"
+	"github.com/carlosrabelo/vmrsync/vmrsync/internal/sshcli"
+	"github.com/carlosrabelo/vmrsync/vmrsync/internal/usage"
 )
 
-func runSetup(args []string) {
+// Run runs the setup subcommand.
+func Run(args []string) {
 	fs := flag.NewFlagSet("vmrsync setup", flag.ExitOnError)
 	var sshPort string
 	var sshKey string
@@ -16,11 +24,11 @@ func runSetup(args []string) {
 	fs.StringVar(&sshPort, "ssh-port", "", "SSH port")
 	fs.StringVar(&sshKey, "ssh-key", "", "SSH private key path")
 	fs.BoolVar(&dryRun, "dry-run", false, "Print the SSH command that would be executed, without running it")
-	fs.Usage = showUsage
+	fs.Usage = usage.Print
 
-	positional, flags := splitArgs(args)
+	positional, flagTokens := argv.SplitArgs(args)
 
-	if err := fs.Parse(flags); err != nil {
+	if err := fs.Parse(flagTokens); err != nil {
 		log.Fatal(err)
 	}
 
@@ -37,13 +45,13 @@ func runSetup(args []string) {
 	}
 
 	machine := positional[0]
-	if err := ensureRemoteSSHHost(machine); err != nil {
+	if err := hostcheck.EnsureRemoteSSHHost(machine); err != nil {
 		log.Fatal(err)
 	}
-	remoteRoot := vmrsyncRoot
+	remoteRoot := config.VmrsyncRoot
 	remoteCmd := fmt.Sprintf("sudo mkdir -p %s && sudo chown %d:%d %s", remoteRoot, uid, uid, remoteRoot)
 
-	sshArgs := append(buildSSHFlags(sshPort, sshKey), machine, remoteCmd)
+	sshArgs := append(sshcli.BuildSSHFlags(sshPort, sshKey), machine, remoteCmd)
 
 	if dryRun {
 		fmt.Printf("ssh %s\n", strings.Join(sshArgs, " "))
@@ -53,7 +61,7 @@ func runSetup(args []string) {
 	fmt.Printf("Setting up %s on %s...\n", remoteRoot, machine)
 	fmt.Printf("  Running: ssh %s\n\n", strings.Join(sshArgs, " "))
 
-	if err := execSSH(sshArgs); err != nil {
+	if err := rsyncrun.ExecSSH(sshArgs); err != nil {
 		log.Fatalf("[ERROR] setup failed: %v", err)
 	}
 

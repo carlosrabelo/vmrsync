@@ -1,12 +1,16 @@
-package main
+package usage
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/carlosrabelo/vmrsync/vmrsync/internal/config"
+	"github.com/carlosrabelo/vmrsync/vmrsync/internal/version"
 )
 
-func showUsage() {
+// Print writes CLI help to stdout.
+func Print() {
 	cmd := filepath.Base(os.Args[0])
 	fmt.Printf(`VM RSync v%s - Synchronize files between local and remote machines via rsync
 
@@ -38,5 +42,5 @@ Examples:
   %s in vm21 project1 --dry-run
   %s out vm21 project1 --exclude "*.log" --exclude "node_modules"
   %s in vm21 --ssh-port 2222 --ssh-key ~/.ssh/id_rsa
-`, VERSION, cmd, vmrsyncRoot, cmd, cmd, cmd, cmd, cmd)
+`, version.Version, cmd, config.VmrsyncRoot, cmd, cmd, cmd, cmd, cmd)
 }

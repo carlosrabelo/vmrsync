@@ -1,4 +1,4 @@
-package main
+package hostcheck
 
 import (
 	"fmt"
@@ -9,9 +9,9 @@ import (
 
 // Overridable for tests.
 var (
-	getHostname     = os.Hostname
-	listLocalAddrs  = net.InterfaceAddrs
-	lookupHostIPsFn = net.LookupIP
+	GetHostname    = os.Hostname
+	ListLocalAddrs = net.InterfaceAddrs
+	LookupHostIPs  = net.LookupIP
 )
 
 func parseSSHTargetHost(machine string) (host string, err error) {
@@ -32,7 +32,6 @@ func parseSSHTargetHost(machine string) (host string, err error) {
 		}
 		return h[1:closing], nil
 	}
-	// Possible IPv4:port (SSH uses -p for port; reject ambiguous : in IPv6 here).
 	if strings.Count(h, ":") == 1 {
 		colon := strings.LastIndex(h, ":")
 		tail := h[colon+1:]
@@ -76,7 +75,7 @@ func parseIPMaybeZone(host string) net.IP {
 }
 
 func collectLocalInterfaceIPs() (map[string]struct{}, error) {
-	addrs, err := listLocalAddrs()
+	addrs, err := ListLocalAddrs()
 	if err != nil {
 		return nil, err
 	}
@@ -105,9 +104,9 @@ func ipIsForbidden(ip net.IP, localIPs map[string]struct{}) bool {
 	return isLocal
 }
 
-// ensureRemoteSSHHost rejects machine targets that refer to this host (loopback,
+// EnsureRemoteSSHHost rejects machine targets that refer to this host (loopback,
 // local hostname, or addresses assigned to local non-loopback interfaces).
-func ensureRemoteSSHHost(machine string) error {
+func EnsureRemoteSSHHost(machine string) error {
 	host, err := parseSSHTargetHost(machine)
 	if err != nil {
 		return fmt.Errorf("security error: invalid SSH target %q: %w", machine, err)
@@ -117,7 +116,7 @@ func ensureRemoteSSHHost(machine string) error {
 		return fmt.Errorf("security error: refusing remote host %q: localhost names are not allowed", machine)
 	}
 
-	localName, err := getHostname()
+	localName, err := GetHostname()
 	if err != nil {
 		return fmt.Errorf("security error: could not read local hostname: %w", err)
 	}
@@ -141,9 +140,8 @@ func ensureRemoteSSHHost(machine string) error {
 		return fmt.Errorf("security error: could not list local addresses: %w", err)
 	}
 
-	ips, err := lookupHostIPsFn(host)
+	ips, err := LookupHostIPs(host)
 	if err != nil {
-		// Unresolved names may be SSH config aliases; literal checks already passed.
 		return nil
 	}
 	for _, ip := range ips {
