@@ -1,0 +1,26 @@
+complete -c vmrsync -f
+
+complete -c vmrsync -n __fish_use_subcommand -a restore -d 'Sync FROM remote TO local'
+complete -c vmrsync -n __fish_use_subcommand -a backup -d 'Sync FROM local TO remote'
+complete -c vmrsync -n __fish_use_subcommand -a check -d 'Verify SSH and sync paths'
+complete -c vmrsync -n __fish_use_subcommand -a prepare -d 'Create /vmrsync on remote'
+complete -c vmrsync -n __fish_use_subcommand -a completion -d 'Install shell completion'
+complete -c vmrsync -n __fish_use_subcommand -a version -d 'Show version'
+complete -c vmrsync -n __fish_use_subcommand -a help -d 'Show help'
+
+complete -c vmrsync -n '__fish_seen_subcommand_from restore backup check' -l dry-run -d 'Print rsync command without running it'
+complete -c vmrsync -n '__fish_seen_subcommand_from restore backup check' -l exclude -r -d 'Exclude files matching pattern'
+complete -c vmrsync -n '__fish_seen_subcommand_from restore backup check' -l exclude-from -r -F -d 'Read exclude patterns from file'
+complete -c vmrsync -n '__fish_seen_subcommand_from restore backup check' -l ssh-port -r -d 'SSH port'
+complete -c vmrsync -n '__fish_seen_subcommand_from restore backup check' -l ssh-key -r -F -d 'SSH private key path'
+complete -c vmrsync -n '__fish_seen_subcommand_from restore backup check' -l verbose -d 'Enable verbose output'
+complete -c vmrsync -n '__fish_seen_subcommand_from restore backup check' -l quiet -d 'Suppress progress output'
+complete -c vmrsync -n '__fish_seen_subcommand_from restore backup check' -l no-delete -d 'Do not delete files at destination'
+complete -c vmrsync -n '__fish_seen_subcommand_from restore backup check' -l staging -d 'Use /vmrsync as remote root'
+complete -c vmrsync -n '__fish_seen_subcommand_from restore backup check' -l timeout-seconds -r -d 'Hard timeout for rsync'
+
+complete -c vmrsync -n '__fish_seen_subcommand_from prepare' -l dry-run -d 'Print SSH command without running it'
+complete -c vmrsync -n '__fish_seen_subcommand_from prepare' -l ssh-port -r -d 'SSH port'
+complete -c vmrsync -n '__fish_seen_subcommand_from prepare' -l ssh-key -r -F -d 'SSH private key path'
+
+complete -c vmrsync -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish' -d 'Shell'

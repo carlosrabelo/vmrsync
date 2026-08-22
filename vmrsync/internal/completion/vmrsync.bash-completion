@@ -1,0 +1,42 @@
+#!/bin/bash
+
+_vmrsync_completion() {
+    local cur prev words cword
+    _init_completion || return
+
+    case ${prev} in
+        restore|backup|check)
+            return
+            ;;
+        --exclude|--exclude-from)
+            _filedir
+            return
+            ;;
+        --ssh-port)
+            return
+            ;;
+        --ssh-key)
+            _filedir
+            return
+            ;;
+    esac
+
+    if [[ ${cword} -eq 1 ]]; then
+        COMPREPLY=($(compgen -W "restore backup check prepare completion version help" -- "${cur}"))
+        return
+    fi
+
+    if [[ ${words[1]} == completion ]]; then
+        COMPREPLY=($(compgen -W "bash zsh fish" -- "${cur}"))
+        return
+    fi
+
+    if [[ ${words[1]} == prepare ]]; then
+        COMPREPLY=($(compgen -W "--dry-run --ssh-port --ssh-key" -- "${cur}"))
+        return
+    fi
+
+    COMPREPLY=($(compgen -W "--dry-run --exclude --exclude-from --ssh-port --ssh-key --verbose --quiet --no-delete --staging --timeout-seconds" -- "${cur}"))
+}
+
+complete -F _vmrsync_completion vmrsync

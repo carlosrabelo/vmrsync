@@ -1,0 +1,55 @@
+#compdef vmrsync
+
+_vmrsync() {
+	local -a commands
+	commands=(
+		'restore:Sync FROM remote TO local'
+		'backup:Sync FROM local TO remote'
+		'check:Verify SSH and sync paths'
+		'prepare:Create /vmrsync on remote'
+		'completion:Install shell completion'
+		'version:Show version'
+		'help:Show help'
+	)
+
+	_arguments -C \
+		'1: :->cmds' \
+		'*::arg:->args'
+
+	case $state in
+	cmds)
+		_describe -t commands 'command' commands
+		;;
+	args)
+		case $words[1] in
+		restore|backup|check)
+			_arguments \
+				'--dry-run[Print rsync command without running it]' \
+				'--exclude[Exclude files matching pattern]:pattern:' \
+				'--exclude-from[Read exclude patterns from file]:file:_files' \
+				'--ssh-port[SSH port]:port:' \
+				'--ssh-key[SSH private key path]:file:_files' \
+				'--verbose[Enable verbose output]' \
+				'--quiet[Suppress progress output]' \
+				'--no-delete[Do not delete files at destination]' \
+				'--staging[Use /vmrsync as remote root]' \
+				'--timeout-seconds[Hard timeout for rsync]:seconds:' \
+				'1:machine:' \
+				'2:folder:'
+			;;
+		prepare)
+			_arguments \
+				'--dry-run[Print SSH command without running it]' \
+				'--ssh-port[SSH port]:port:' \
+				'--ssh-key[SSH private key path]:file:_files' \
+				'1:machine:'
+			;;
+		completion)
+			_values 'shell' bash zsh fish
+			;;
+		esac
+		;;
+	esac
+}
+
+_vmrsync
